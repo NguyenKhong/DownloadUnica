@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Trang quản trị tài khoản Unica.vn</title>
+    <meta name="csrf-token" content="am5ZdC5CalMcGQ04SCwHCxwnaSB4EUcfHxxgHUEjAgccBG0lV3EaFg==">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--===============================================================================================-->
+    <link rel="icon" type="image/png" href="https://static.unica.vn/icon/favicon.ico"/>
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/vendor/bootstrap/css/bootstrap.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/fonts/font-awesome-4.7.0/css/font-awesome.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/fonts/Linearicons-Free-v1.0.0/icon-font.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/vendor/animate/animate.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/vendor/css-hamburgers/hamburgers.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/vendor/animsition/css/animsition.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/vendor/select2/select2.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/vendor/daterangepicker/daterangepicker.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="/css/util.css">
+    <link rel="stylesheet" type="text/css" href="/css/main.css">
+    <!--===============================================================================================-->
+</head>
+<body>
+
+<div class="limiter">
+    <div class="container-login100" style="background-image: url('/images/bg-01.jpg');">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.3.0/css/datepicker.css" rel="stylesheet" type="text/css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.3.0/js/bootstrap-datepicker.js"></script>
+<div class="wrap-login100 p-l-110 p-r-110 p-t-20 p-b-13">
+    <form id="login_normal" name="login_normal" method="POST" class="login100-form validate-form flex-sb flex-w">
+        <input id="form-token" type="hidden" name="_csrf" value="am5ZdC5CalMcGQ04SCwHCxwnaSB4EUcfHxxgHUEjAgccBG0lV3EaFg=="/>
+        <span class="login100-form-title p-b-10">
+            <img src="/images/logo.png" />
+        </span>
+
+        <div class="p-t-10 p-b-10 col-md-12" style="text-align: center;color: #555">
+            <h3>ĐĂNG NHẬP</h3>
+        </div>
+
+        <div class="wrap-input100 validate-input" data-validate = "Email không được để trống">
+            <input class="input100" type="text" name="email" placeholder="Nhập email"  value="" >
+            <span class="focus-input100"></span>
+        </div>
+
+        <div class="clearfix"></div>
+
+        <div class="p-t-1"> &nbsp;
+        </div>
+
+
+
+        <div class="wrap-input100 validate-input" data-validate = "Mật khẩu không được để trống">
+            <input class="input100" type="password" name="pass" placeholder="Nhập mật khẩu" >
+            <span class="focus-input100"></span>
+        </div>
+
+        
+        <div class="container-login100-form-btn m-t-17">
+            <button form="login_normal" type="submit" class="login100-form-btn">
+                ĐĂNG NHẬP
+            </button>
+        </div>
+
+        <div class="p-t-10 p-b-9 col-md-12">
+            <center>
+            <span class="txt1">
+                Hoặc
+            </span>
+            </center>
+        </div>
+
+        <div class="clearfix"></div>
+
+        <a style="width: 100%;" href="javascript:void(0)" onclick="return login();" class="btn-face m-b-20">
+            <i class="fa fa-facebook-official"></i>
+            Đăng nhập bằng Facebook
+        </a>
+
+        <div class="w-full text-center">
+            <span class="txt2">
+                Bạn chưa có tài khoản?
+            </span>
+            <a href="/register" class="txt2 bo1">
+                Đăng ký mới
+            </a>
+            <br/>
+            <a style="color: red;" href="/reset_pass" class="txt2 m-l-5">
+                Quên mật khẩu?
+            </a>
+
+        </div>
+        
+        <div class="clearfix"></div>
+
+    </form>
+</div>
+<script>
+    window.fbAsyncInit = function() {
+        FB.init({
+            appId      : '410486232859596',
+            xfbml      : true,
+            version    : 'v2.10'
+        });
+    };
+    (function(d, s, id){
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) {return;}
+        js = d.createElement(s); js.id = id;
+        js.src = "//connect.facebook.net/en_US/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    function login(){
+        FB.login(function(response){
+            if(response.status === 'connected'){
+                var url = window.location.href;
+                var arguments = url.split('?');
+                var ip = $('body').find('input[name=ip]').val();
+                getInfo(arguments[1], ip);
+            } else if(response.status === 'not_authorized') {
+                console.log(response.status);
+            } else {
+                console.log(response.status);
+            }
+
+        }, {scope: 'email'});
+    }
+    // get user basic info
+
+    function getInfo(params, ip) {
+        FB.api('/me', 'GET', {fields: 'id, name, email, link, birthday, gender'}, function(response) {
+            var email = '';
+            if(response['email']){
+                email = response['email'];
+            }
+            $.ajax({
+                url: '/site/login_fb',
+                type: 'post',
+                data: {
+                    'id' : response['id'],
+                    'name' : response['name'],
+                    'email': email,
+                    '_csrf' : $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function (response) {
+                    //console.log(response);
+
+                    if(response == false){
+                        $('input[name="email_add"]').val('');
+                        $('input[name="phone_add"]').val('');
+                        $('#myModal').modal('show');
+                        $('input[name="pass"]').val('123456');
+                        $('input[name="email"]').val('emailexample@gmail.com');
+                    } else {
+                        location.href = response;
+                    }
+
+                }
+            })
+
+        });
+    }
+</script>
+
+<!-- Modal -->
+
+<div class="modal fade" id="myModal" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nhập Email của bạn để hoàn tất đăng nhập.</h5>
+            </div>
+            <div class="modal-body">
+                <form id="login_fb" name="login_fb" method="POST" action="/site/update_email" class="login100-form validate-form flex-sb flex-w">
+                    <input id="form-token-1" type="hidden" name="_csrf" value="am5ZdC5CalMcGQ04SCwHCxwnaSB4EUcfHxxgHUEjAgccBG0lV3EaFg=="/>
+                    <div class="wrap-input100 validate-input form-group" data-validate = "Email để trống hoặc không đúng định dạng">
+                        <input placeholder="Nhập email của bạn" class="input100" type="email" value="example@gmail.vn" name="email_add" >
+                        <span class="focus-input100"></span>
+                    </div>
+                    <div class="wrap-input100 validate-input" data-validate = "Số điện thoại trống hoặc không đúng định dạng">
+                        <input placeholder="Nhập số điện thoại của bạn" class="input100" type="text" value="0349598200" name="phone_add" required="required">
+                        <span class="focus-input100"></span>
+                    </div>
+                    <div class="city" style="width: 100%;">
+                        <div class="wrap-input100 validate-input register-input" data-validate = "Yêu cầu chọn tỉnh thành">
+    <select name="city" class="input100">
+    	<option value="18">Chọn tỉnh/thành phố</option>
+    	<option value="18">Hà Nội</option>
+    	<option value="52">TP Hồ Chí Minh</option>
+    	<option value="56">An Giang</option><option value="19">Bắc Giang</option><option value="6">Bắc Kạn</option><option value="65">Bạc Liêu</option><option value="2">Bắc Ninh</option><option value="54">Bà Rịa - Vũng Tàu</option><option value="60">Bến Tre</option><option value="49">Bình Dương</option><option value="45">Bình Phước</option><option value="51">Bình Thuận</option><option value="39">Bình Định</option><option value="68">Cà Mau</option><option value="1">Cao Bằng</option><option value="59">Cần Thơ</option><option value="40">Gia Lai</option><option value="3">Hà Giang</option><option value="25">Hà Nam</option><option value="22">Hải Dương</option><option value="24">Hải Phòng</option><option value="31">Hà Tĩnh</option><option value="63">Hậu Giang</option><option value="23">Hòa Bình</option><option value="8">Hưng Yên</option><option value="43">Khánh Hòa</option><option value="62">Kiên Giang</option><option value="38">Kon Tum</option><option value="4">Lai Châu</option><option value="46">Lâm Đồng</option><option value="14">Lạng Sơn</option><option value="5">Lào Cai</option><option value="53">Long An</option><option value="28">Nam Định</option><option value="30">Nghệ An</option><option value="27">Ninh Bình</option><option value="47">Ninh Thuận</option><option value="17">Phú Thọ</option><option value="9">Phú Yên</option><option value="20">Quảng Ninh</option><option value="33">Quảng Trị</option><option value="32">Quảng Bình</option><option value="36">Quảng Nam</option><option value="37">Quảng Ngãi</option><option value="13">Sóc Trăng</option><option value="16">Sơn La</option><option value="48">Tây Ninh</option><option value="26">Thái Bình</option><option value="12">Thái Nguyên</option><option value="29">Thanh Hóa</option><option value="34">Thừa Thiên Huế</option><option value="58">Tiền Giang</option><option value="64">Trà Vinh</option><option value="7">Tuyên Quang</option><option value="15">Vĩnh Phúc</option><option value="61">Vĩnh Long</option><option value="11">Yên Bái</option><option value="35">Đà Nẵng</option><option value="42">Đăk Lăk</option><option value="44">Đăk Nông</option><option value="10">Điện Biên</option><option value="50">Đồng Nai</option><option value="57">Đồng Tháp</option>    </select>   
+    <span class="focus-input100"></span>
+</div>                    </div>
+                    <div class="form-group wrap-input100" style="margin-top: 15px;"  data-validate = "Chọn giới tính">
+                        <select class="form-control" name="gender" required="required" style="height:35px;border:none;">
+<option value="">Giới tính</option>
+<option value="0">Nữ</option>
+<option value="1">Nam</option>
+</select>                    </div>
+
+                    <div class="wrap-input100 validate-input" data-validate = "Ngày sinh">
+                        <div id="datepicker" class="input-group date" data-date-format="dd-mm-yyyy">
+                            <input class="input100" type="text" autocomplete="off" name="birthday" placeholder="Ngày sinh"/>
+                            <span style="background: white;border: none;border-radius: 25px;" class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                        </div>
+                    </div>
+                    <div class="container-login100-form-btn m-t-17">
+                        <button form="login_fb" type="submit" class="login100-form-btn">
+                            Đăng nhập
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" class="close" data-dismiss="modal">&times; Đóng lại</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+    // $("#datepicker").datepicker({
+    //     autoclose: true,
+    //     todayHighlight: true
+    // });
+    // $('.city select').css('border','none !important;');
+</script>
+
+    </div>
+</div>
+
+
+<div id="dropDownSelect1"></div>
+
+<!--===============================================================================================-->
+<script src="/vendor/jquery/jquery-3.2.1.min.js"></script>
+<!--===============================================================================================-->
+<script src="/vendor/animsition/js/animsition.min.js"></script>
+<!--===============================================================================================-->
+<script src="/vendor/bootstrap/js/popper.js"></script>
+<script src="/vendor/bootstrap/js/bootstrap.min.js"></script>
+<!--===============================================================================================-->
+<script src="/vendor/select2/select2.min.js"></script>
+<!--===============================================================================================-->
+<script src="/vendor/daterangepicker/moment.min.js"></script>
+<script src="/vendor/daterangepicker/daterangepicker.js"></script>
+<!--===============================================================================================-->
+<script src="/vendor/countdowntime/countdowntime.js"></script>
+<!--===============================================================================================-->
+<script src="/js/main.js?v=1.4"></script>
+
+</body>
+</html>
