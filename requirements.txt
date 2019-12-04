@@ -1,5 +1,13 @@
-requests==2.20.0
+requests
 BeautifulSoup
 html5lib
-pycrypto
-naturalsort
+pycountry
+pycryptodome
+isodate
+PySocks
+websocket-client
+iso3166
+iso-639
+certifi
+idna
+chardet

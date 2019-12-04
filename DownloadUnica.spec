@@ -2,7 +2,7 @@
 
 block_cipher = None
 
-added_files = [('.\\ffmpeg', 'ffmpeg'), ('.\\logo', 'logo')]
+added_files = [('.\\ffmpeg', 'ffmpeg'), ('.\\logo', 'logo'), ('.\\streamlink\\plugins', 'plugins')]
 
 a = Analysis(['DownloadUnica.py'],
              pathex=['E:\\Language\\Python\\Unica\\DownloadUnica'],

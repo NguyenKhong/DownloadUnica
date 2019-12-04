@@ -1,1 +1,18 @@
 *.pyc
+# ignore all logs
+*.pyc
+*.mp4
+*.bak
+build
+file*test
+DownloadUnica.log
+example.py
+example2.py
+pass.txt
+ffmpeg.py
+DownloadEdumall_beta_origin.py
+DOWNLOAD
+DownloadEdumall.old.exe
+StreamlinkBak
+__pycache__
+youtube_dl

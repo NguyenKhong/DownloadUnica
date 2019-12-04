@@ -1,37 +1,38 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 
 import sys
+import os
 
 if __package__ is None and not hasattr(sys, 'frozen'):
     # direct call of __main__.py
-    import os.path
+    # print ("import new")
     path = os.path.realpath(os.path.abspath(__file__))
     sys.path.insert(0, os.path.dirname(os.path.dirname(path)))
 
+# input(">>>>> ")
 import requests
-import os
 import re
 from bs4 import BeautifulSoup
 import time
 import timeit
-from urlparse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse
 import unicodedata
 import datetime
 import ntpath
 import struct
 import shutil
 import threading
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import logging
 import ctypes
 import json
-import Queue
-from youtube_dl import YoutubeDL
-from youtube_dl.utils import std_headers
+import queue
 from var_dump import var_dump
-reload(sys)
-sys.setdefaultencoding('utf-8')
+from streamlink_cli.main import main as streamlink_cli_main
+import update
+import version
+import argparse
+
 os.environ['HTTPSVERIFY'] = '0'
 
 g_session = None
@@ -40,21 +41,22 @@ USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:44.0) Gecko/20100101 Firefo
 BASE_URL = 'https://unica.vn/'
 LOGIN_URL = 'https://id.unica.vn/login'
 COURSES_URL = 'https://unica.vn/dashboard/user/course'
-
+PLUGIN_DIR = ""
 if getattr(sys, 'frozen', False):
     FFMPEG_LOCATION = os.path.join(sys._MEIPASS, 'ffmpeg', 'ffmpeg.exe')
+    PLUGIN_DIR = os.path.join(sys._MEIPASS, 'plugins')
 else:
     FFMPEG_LOCATION = os.path.join(os.getcwd(), 'ffmpeg', 'ffmpeg.exe')
 
-std_headers['User-Agent'] = USER_AGENT
+# std_headers['User-Agent'] = USER_AGENT
 
-g_CurrentDir = os.getcwd()
+g_CurrentDir = "d:\\"#os.getcwd()
 kernel32 = ctypes.windll.kernel32
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("DownloadUnica")
 
 stdout_logger = logging.StreamHandler()
-file_logger = logging.FileHandler("DownloadEdumall.log", mode = 'w')
+file_logger = logging.FileHandler("DownloadUnica.log", 'w', 'utf-8')
 formatter = logging.Formatter('%(asctime)s %(funcName)s %(levelname)s: %(message)s')
 stdout_logger.setFormatter(formatter)
 file_logger.setFormatter(formatter)
@@ -64,18 +66,19 @@ logger.addHandler(file_logger)
 logger.setLevel(logging.INFO)
 
 def NoAccentVietnamese(s):
-    s = s.decode('utf-8')
-    s = re.sub(u'Đ', 'D', s)
-    s = re.sub(u'đ', 'd', s)
-    return unicodedata.normalize('NFKD', unicode(s)).encode('ASCII', 'ignore')
+    s = s.encode().decode('utf-8')
+    s = re.sub('Đ', 'D', s)
+    s = re.sub('đ', 'd', s)
+    return unicodedata.normalize('NFKD', str(s)).encode('ASCII', 'ignore')
 
 def removeCharacters(value, deletechars = '<>:"/\|?*'):
+    value = str(value)
     for c in deletechars:
         value = value.replace(c,'')
     return value
 
 def GetFileNameFromUrl(url):
-    urlParsed = urlparse(urllib.unquote(url))
+    urlParsed = urlparse(urllib.parse.unquote(url))
     fileName = os.path.basename(urlParsed.path).encode('utf-8')
     return removeCharacters(fileName)
 
@@ -89,7 +92,6 @@ def pathLeaf(path):
     '''
     head, tail = ntpath.split(path)
     return tail or ntpath.basename(head)
-
 
 def Request(url, method = 'GET', session = None, **kwargs):
   
@@ -118,7 +120,7 @@ def Login(user, password):
     
     r = Request(LOGIN_URL, session = g_session, headers = {'referer' : BASE_URL})
 
-    _csrf = re.findall(r'<input id="form-token" type="hidden" name="_csrf" value="(.*?)"\/>', r.content)
+    _csrf = re.findall(r'<input id="form-token" type="hidden" name="_csrf" value="(.*?)"\/>', r.text)
     if not _csrf:
         logger.critical("Dang nhap loi vui long lien he nha phat trien")
         sys.exit(1)
@@ -132,9 +134,9 @@ def Login(user, password):
         }
     r = Request(LOGIN_URL, 'POST', data = payload, headers = headers, session = g_session)  
 
-    error = re.findall(r'class="alert\salert-danger\salert-dismissable\scol-md-12">\s+<a href="#"\sclass="close"\sdata-dismiss="alert"\saria-label="close">×<\/a>\s+<strong>\s+<center>(.*?)<br\/>', r.content, re.DOTALL)
+    error = re.findall(r'class="alert\salert-danger\salert-dismissable\scol-md-12">\s+<a href="#"\sclass="close"\sdata-dismiss="alert"\saria-label="close">×<\/a>\s+<strong>\s+<center>(.*?)<br\/>', r.text, re.DOTALL)
     if error:
-        logger.critical("Dang nhap loi: %s" % error[0])
+        logger.critical("Dang nhap loi: %s" % str(error[0]))
         sys.exit(1)
     return True
 
@@ -155,7 +157,7 @@ def GetCourses():
             return []
         url = course.find('div', {'class' : 'ugb-block-txt'}).a['href']
         name = removeCharacters(name.text)
-        UrlCourses.append({'url' : urljoin(COURSES_URL, url), 'title' : NoAccentVietnamese(name).strip()})
+        UrlCourses.append({'url' : urljoin(COURSES_URL, url), 'title' : name.strip()})
 
     return UrlCourses
 
@@ -189,33 +191,44 @@ def GetLessions(url):
         if not tag_a:
             logger.warning("Loi Phan tich Ten bai giang")
             return []
-        UrlLessions.append({'url' : urljoin(url, tag_a.get('href')), 'title' : NoAccentVietnamese(removeCharacters(tag_a.text)).strip()})
+        UrlLessions.append({'url' : urljoin(url, tag_a.get('href')), 'title' : removeCharacters(tag_a.text).strip()})
     return UrlLessions 
 
-def GetVideoAndDocument(url, isGetLinkDocument = True):
+def GetVideoAndDocument(url, serverOption = 1, isGetLinkDocument = True):
     headers = {'origin' : BASE_URL, 'referer' : url}
     infoMedia = {}
-    url_server_vn = url + "?server=vn"
-    url_server_qt = url + "?server=qt"
+    servers = [
+        url + "?server=vn",
+        url + "?server=qt"
+    ]
+    
 
-    r = Request(url_server_qt, headers = headers, session = g_session)
+    r = Request(servers[serverOption-1], headers = headers, session = g_session)
     # url_videos = re.findall(r'{"file":"(.*?)","label":"(\d+)p', r.content)
-    url_videos = re.findall(r'{"file":"([^\[\{\"]*?)","label":"', r.content)
-    if url_videos:        
-        infoMedia['url'] = url_videos[0].replace("\\/", "/")
+    # url_videos = re.findall(r'{"file":"([^\[\{\"]*?)","label":"', r.text)
+    url_videos = re.findall(r'src: "(.*?)".*?label: "(\d+)"', r.text, re.DOTALL)
+
+    if url_videos:
+        max_resolution = -1
+        for url, resolution in url_videos:
+            resolution = int(resolution)
+            if resolution > max_resolution:
+                max_resolution = resolution
+                infoMedia['url'] = url.replace("\\/", "/")
+                
         infoMedia['headers'] = {'origin' : BASE_URL, 'referer' : url}
         infoMedia['protocol'] = 'm3u8'
     
     else:
-        r = Request(url_server_vn, headers = headers, session = g_session)
-        url_videos = re.findall(r'src: "(.*?)",', r.content)
+        # r = Request(url_server_vn, headers = headers, session = g_session)
+        url_videos = re.findall(r'src: "(.*?)",', r.text)
         if url_videos:
             infoMedia['url'] = url_videos[-1].replace("\\/", "/")
             infoMedia['headers'] = {'origin' : BASE_URL, 'referer' : url}
             infoMedia['protocol'] = 'm3u8'
-        else:
-            logger.warning('Loi lay thong tin tai video')
 
+    if infoMedia == {}:
+        logger.warning('Loi lay thong tin tai video')
     urlDocuments = []
     if isGetLinkDocument:
         soup = BeautifulSoup(r.content, 'html5lib')
@@ -223,7 +236,6 @@ def GetVideoAndDocument(url, isGetLinkDocument = True):
         # if documentDownload.text.find(u'Tài liệu của bài học') != -1:
         for i in documentDownloads:
             urlDocuments.append(urljoin(url, i.a.get('href'))) 
-
     return infoMedia, urlDocuments 
 
 def DownloadFile(url, pathLocal, isSession = False, headers = {}):
@@ -245,7 +257,7 @@ def DownloadFile(url, pathLocal, isSession = False, headers = {}):
         with open(fullPath, 'wb') as f:
             for chunk in r.iter_content(5242880):
                 f.write(chunk)
-        print fileName
+        print(fileName)
     except Exception as e:
         logger.warning("Loi: %s - url: %s", e, url)
         return False
@@ -256,15 +268,15 @@ def DownloadFile(url, pathLocal, isSession = False, headers = {}):
 
 def TryDownloadDocument(urls, pathLocal):
     for url in urls:
-        for i in xrange(5):
+        for i in range(5):
             if DownloadFile(url, pathLocal, isSession=True):
                 break
             time.sleep(1)
 
 def DownloadCourses():
-    print ""
-    email = raw_input(' Email: ')
-    password = raw_input(' Password: ')
+    print("")
+    email = input(' Email: ')
+    password = input(' Password: ')
     if (email == "") or (password == ""):
         print ("email hoac password khong co")
         return
@@ -272,42 +284,60 @@ def DownloadCourses():
     if not Login(email, password):
         return
 
-    print 30*"="
-    Courses = GetCourses()
-    if not Courses: return
+    print(30*"=")
+    if args.bypass_buy:
+        url = input('Nhap url khoa hoc: ')
+        CoursesDownload = getCourseNoBuy(url)
+    else:
+        Courses = GetCourses()
+        if not Courses: return
 
-    print "Danh sach cac khoa hoc: "
-    i = 1
-    for course in Courses:
-        print "\t %d. %s" % (i, course['title'])
-        i += 1
+        print("Danh sach cac khoa hoc: ")
+        i = 1
+        for course in Courses:
+            print("\t %d. %s" % (i, course['title']))
+            i += 1
 
-    print "\n  Lua chon tai ve cac khoa hoc"
-    print "  Vd: 1, 2 hoac 1-5, 7"
-    print "  Mac dinh la tai ve het\n"
+        print("\n  Lua chon tai ve cac khoa hoc")
+        print("  Vd: 1, 2 hoac 1-5, 7")
+        print("  Mac dinh la tai ve het\n")
 
-    rawOption = raw_input('(%s)$: ' % email)
-    CoursesDownload = ParseOption(Courses, rawOption)
+        rawOption = input('(%s)$: ' % email)
+        CoursesDownload = ParseOption(Courses, rawOption)
+
     if not CoursesDownload: return
+
+    try:
+        print ("Danh sach server tai video: \n\t1 viet nam\n\t2 quoc te")
+        serverOption = input('Chon server download [1]: ')
+        if serverOption == "":
+            serverOption = 1
+        serverOption = int(serverOption)
+        if serverOption != 1 and serverOption != 2:
+            print (">>> Xin vui long nhap dung so server")
+            return
+    except ValueError:
+        print(">>> Nhap so")
+        return
     
     try:
-        NumOfThread = raw_input('So luong download [5]: ')
+        NumOfThread = input('So luong download [5]: ')
         if NumOfThread == "":
             NumOfThread = 5
         NumOfThread = int(NumOfThread)
     except ValueError:
-        print ">>> Nhap so"
+        print(">>> Nhap so")
         return
 
     listPathDirLessions = []
     DirDownload = os.path.join(g_CurrentDir, "DOWNLOAD")
     if not os.path.exists(DirDownload): os.mkdir(DirDownload)
-    print ""
-    print 30*"="
+    print("")
+    print(30*"=")
     iCourses = 0
     lenCourses = len(CoursesDownload)
     for course in CoursesDownload:
-        print course['title']
+        print(course['title'])
         pathDirCourse = os.path.join(DirDownload, removeCharacters(course['title'], '.<>:"/\|?*\r\n'))
         if not os.path.exists(pathDirCourse): os.mkdir(pathDirCourse)
         pathDirComplete = os.path.join(pathDirCourse, "complete")
@@ -318,11 +348,11 @@ def DownloadCourses():
         iLessions = 1
         lenLessions = len(Lessions)
         for Lession in Lessions:
-            print Lession['title']
+            print(Lession['title'])
             
             lessionTitleClean = removeCharacters(Lession['title'], '.<>:"/\|?*\r\n')
 
-            infoMedia, urlDocuments = GetVideoAndDocument(Lession['url'])
+            infoMedia, urlDocuments = GetVideoAndDocument(Lession['url'], serverOption)
             
             if not infoMedia: continue
 
@@ -330,84 +360,96 @@ def DownloadCourses():
             threadDownloadDocument.setDaemon(False)
             threadDownloadDocument.start()
 
-            
-            std_headers.update(infoMedia['headers'])
-            if not os.path.exists(os.path.join(pathDirComplete, lessionTitleClean + ".mp4")):
-                outtemplate = os.path.join(pathDirComplete, lessionTitleClean + '.%(ext)s')
-                
-                hls_prefer_native = False
-                format_opt = 'bestvideo+bestaudio'
-                if infoMedia['protocol'] == 'm3u8':
-                    hls_prefer_native = True
-                    format_opt = 'best'
+            pathFileOutput = os.path.join(pathDirComplete, lessionTitleClean + ".mp4")
+            if not os.path.exists(pathFileOutput):
+                options = [
+                    # '--loglevel',
+                    # 'debug',
+                    '--ringbuffer-size',
+                    '64M',
+                    '--ffmpeg-ffmpeg',
+                    FFMPEG_LOCATION,
+                    # '--output',
+                    # pathFileOutput,
+                    '--player-no-close',
+                    '--player',
+                    FFMPEG_LOCATION,
+                    '-a',
+                    '-i {filename} -y -c copy -bsf:a aac_adtstoasc -metadata "comment=Download_Unica (^v^)" "%s"' % pathFileOutput,
+                    '--fifo',
+                    '--hls-segment-threads',
+                    str(NumOfThread),
+                    infoMedia['url'],
+                    'best'
+                ]
+                if PLUGIN_DIR:
+                    options.append('--plugin-dirs')
+                    options.append(PLUGIN_DIR)
 
-                opts = { 'format' : format_opt,
-                        'num_of_thread' : NumOfThread,
-                        'hls_prefer_native': hls_prefer_native,
-                        'outtmpl' : outtemplate,
-                        #'verbose' : True,
-                        'logger' : logger,
-                        'logtostderr': True,
-                        'ffmpeg_location' : FFMPEG_LOCATION,
-                        'consoletitle' : False,
-                        'fragment_retries': 5
-                }
+                infoMedia["headers"].update({"User-Agent": USER_AGENT})
                 
-                with YoutubeDL(opts) as ydl:
-                    ydl.download([infoMedia['url']])
-            
+                for k, v in infoMedia["headers"].items():
+                    options.append("--http-header")
+                    options.append("%s=%s" % (k, v))
+                streamlink_cli_main(options)
+
             percentLessions = iLessions*1.0/lenLessions*100.0
             message = "Total: %.2f%% - %s: %.2f%%" % (percentLessions/lenCourses + iCourses*1.0/lenCourses*100.0, course['title'], percentLessions)
             kernel32.SetConsoleTitleW(ctypes.c_wchar_p(message))
             
             iLessions += 1
-            print 40*"*"
+            print(40*"*")
         
-        print 50*"="
+        print(50*"=")
         iCourses += 1
         message = "Total: %.2f%%" % (iCourses*1.0/lenCourses*100.0)
         kernel32.SetConsoleTitleW(ctypes.c_wchar_p(message))        
 
 def DonwloadLessions():
-    print ""
-    email = raw_input(' Email: ')
-    password = raw_input(' Password: ')
+    print("")
+    email = input(' Email: ')
+    password = input(' Password: ')
     if (email == "") or (password == ""):
         logger.info("email hoac password khong co")
         return
 
     if not Login(email, password): return
 
-    print 30*"="
-    Courses = GetCourses()
+    print(30*"=")
+    if args.bypass_buy:
+        url = input('Nhap url khoa hoc: ')
+        Courses = getCourseNoBuy(url)
+    else:
+        Courses = GetCourses()
+
     if not Courses: return
 
-    print " Danh sach cac khoa hoc: "
+    print(" Danh sach cac khoa hoc: ")
     i = 1
     for course in Courses:
-        print "\t %d. %s" % (i, course['title'])
+        print("\t %d. %s" % (i, course['title']))
         i += 1
 
-    print "\n Lua chon tai ve 1 khoa hoc"
+    print("\n Lua chon tai ve 1 khoa hoc")
 
-    rawOption = raw_input(' (%s)$: ' % email)
+    rawOption = input(' (%s)$: ' % email)
     try:
         lenCourses = len(Courses)
         index = int(rawOption) - 1
-        if index > lenCourses:
+        if index > lenCourses - 1:
             index = lenCourses - 1
         if index < 0:
             index = 0
         course = Courses[index]
     except ValueError:
-        print " Lam on nhap SO"
+        print(" Lam on nhap SO")
         return
 
     DirDownload = os.path.join(g_CurrentDir, "DOWNLOAD")
     if not os.path.exists(DirDownload): os.mkdir(DirDownload)
-    print 30*"="
-    print ""
-    print course['title']
+    print(30*"=")
+    print("")
+    print(course['title'])
     pathDirCourse = os.path.join(DirDownload, removeCharacters(course['title'], '.<>:"/\|?*\r\n'))
     if not os.path.exists(pathDirCourse): os.mkdir(pathDirCourse)
     pathDirComplete = os.path.join(pathDirCourse, "complete")
@@ -416,35 +458,48 @@ def DonwloadLessions():
     if not os.path.exists(DirDocuments): os.mkdir(DirDocuments)
     Lessions = GetLessions(course['url'])
     if not Lessions: return
-    print "Danh sach cac bai giang: "
+    print("Danh sach cac bai giang: ")
     i = 1
     for Lession in Lessions:
-        print "\t %d. %s" % (i, Lession['title'])
+        print("\t %d. %s" % (i, Lession['title']))
         i += 1
 
-    print "\n  Lua chon tai ve cac bai giang"
-    print "  Vd: 1, 2 hoac 1-5, 7"
-    print "  Mac dinh la tai ve het\n"
+    print("\n  Lua chon tai ve cac bai giang")
+    print("  Vd: 1, 2 hoac 1-5, 7")
+    print("  Mac dinh la tai ve het\n")
 
-    rawOption = raw_input('(%s)$: ' % email)
+    rawOption = input('(%s)$: ' % email)
     LessionsDownload = ParseOption(Lessions, rawOption)
     if not LessionsDownload: return
 
     try:
-        NumOfThread = raw_input(' So luong download cung luc [5]: ')
+        print ("Danh sach server tai video: \n\t1 viet nam\n\t2 quoc te")
+        serverOption = input('Chon server download [1]: ')
+        if serverOption == "":
+            serverOption = 1
+        serverOption = int(serverOption)
+        if serverOption != 1 and serverOption != 2:
+            print (">>> Xin vui long nhap dung so server")
+            return
+    except ValueError:
+        print(">>> Nhap so")
+        return
+
+    try:
+        NumOfThread = input(' So luong download cung luc [5]: ')
         if NumOfThread == "":
             NumOfThread = 5
         NumOfThread = int(NumOfThread)
     except ValueError:
-        print ">>> Nhap so"
+        print(">>> Nhap so")
         return
 
     for Lession in LessionsDownload:
-        print Lession['title']
+        print(Lession['title'])
         
         lessionTitleClean = removeCharacters(Lession['title'], '.<>:"/\|?*\r\n')
 
-        infoMedia, urlDocuments = GetVideoAndDocument(Lession['url'])
+        infoMedia, urlDocuments = GetVideoAndDocument(Lession['url'], serverOption)
         
         if not infoMedia: continue
 
@@ -452,60 +507,93 @@ def DonwloadLessions():
         threadDownloadDocument.setDaemon(False)
         threadDownloadDocument.start()
 
-        
-        std_headers.update(infoMedia['headers'])
-        if not os.path.exists(os.path.join(pathDirComplete, lessionTitleClean + ".mp4")):
-            outtemplate = os.path.join(pathDirComplete, lessionTitleClean + '.%(ext)s')
+        pathFileOutput = os.path.join(pathDirComplete, lessionTitleClean + ".mp4")
+        if not os.path.exists(pathFileOutput):
+            options = [
+                '--loglevel',
+                'debug',
+                '--ringbuffer-size',
+                '64M',
+                '--ffmpeg-ffmpeg',
+                FFMPEG_LOCATION,
+                # '--output',
+                # pathFileOutput,
+                '--player-no-close',
+                '--player',
+                FFMPEG_LOCATION,
+                '-a',
+                '-i {filename} -y -c copy -bsf:a aac_adtstoasc -metadata "comment=Download_Unica (^v^)" "%s"' % pathFileOutput,
+                '--fifo',
+                '--hls-segment-threads',
+                str(NumOfThread),
+                infoMedia['url'],
+                'best'
+            ]
+            if PLUGIN_DIR:
+                    options.append('--plugin-dirs')
+                    options.append(PLUGIN_DIR)
+            infoMedia["headers"].update({"User-Agent": USER_AGENT})
             
-            hls_prefer_native = False
-            format_opt = 'bestvideo+bestaudio'
-            if infoMedia['protocol'] == 'm3u8':
-                hls_prefer_native = True
-                format_opt = 'best'
+            for k, v in infoMedia["headers"].items():
+                options.append("--http-header")
+                options.append("%s=%s" % (k, v))
+            streamlink_cli_main(options)
 
-            opts = { 'format' : format_opt,
-                    'num_of_thread' : NumOfThread,
-                    'hls_prefer_native': hls_prefer_native,
-                    'outtmpl' : outtemplate,
-                    #'verbose' : True,
-                    'logger' : logger,
-                    'logtostderr': True,
-                    'ffmpeg_location' : FFMPEG_LOCATION,
-                    'consoletitle' : False
-            }
-
-            with YoutubeDL(opts) as ydl:
-                ydl.download([infoMedia['url']])
-
-        print 50*"="
+        print(50*"=")
 
 def ParseOption(listOption, rawOption):
     
     listOptionDownload = listOption
-    if rawOption != "":
-        try:
-            listOptionDownload = []
-            option = rawOption.split(",")
-            lenCourses = len(listOption)
-            for i in option:
-                if i.find("-") != -1:
-                    c = i.split("-")
-                    c = map(int, c)
-                    c[0] -= 1
-                    if c[0] < 0:
-                        c[0] = 0
-                    listOptionDownload += listOption[c[0]:c[1]]
-                else:
-                    index = int(i) - 1
-                    if index > lenCourses - 1:
-                        index = lenCourses - 1
-                    if index < 0:
-                        index = 0
-                    listOptionDownload.append(listOption[index])
-            return list(listOptionDownload)
-        except ValueError:
-            print ">>> Lam on nhap so."
-            return None
+    if rawOption == "": return listOptionDownload
+    try:
+        listOptionDownload = []
+        option = rawOption.split(",")
+        lenCourses = len(listOption)
+        for i in option:
+            if i.find("-") != -1:
+                c = i.split("-")
+                c = list(map(int, c))
+                c[0] -= 1
+                if c[0] < 0:
+                    c[0] = 0
+                listOptionDownload += listOption[c[0]:c[1]]
+            else:
+                index = int(i) - 1
+                if index > lenCourses - 1:
+                    index = lenCourses - 1
+                if index < 0:
+                    index = 0
+                listOptionDownload.append(listOption[index])
+        return list(listOptionDownload)
+    except ValueError:
+        print(">>> Lam on nhap so.")
+        return None
+
+def getCourseNoBuy(url):
+    r = Request(url, session = g_session)
+    result = re.search(r'"name": "(?P<title>.*?)".*?"sku": "(?P<id>\d+)"', r.text, re.DOTALL)
+    
+    if result:
+        return [{
+                'title': str(result.group('title')).strip(),
+                'url': "https://unica.vn/learn/%s/overview" % result.group('id'),
+            }
+        ]
+    return []
+
+def build_args():
+    global args
+    description = """\
+Please enter -n or --no-update to disable process update."""
+    parser = argparse.ArgumentParser(description = description, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-n', '--no-update', action = 'store_false', dest="no_update", help = 'Disable update')
+
+    description = """\
+Please enter -b or --bypass-buy to bypass buy course."""
+    parser = argparse.ArgumentParser(description = description, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-b', '--bypass-buy', action = 'store_true', dest="bypass_buy", help = 'bypass buy course')
+    args = parser.parse_args()
+    return args
 
 def menu():
     if getattr(sys, 'frozen', False):
@@ -517,12 +605,12 @@ def menu():
         for i in f:
             sys.stdout.write(i)
             time.sleep(0.07)
-
-    print ""
-    print "\t0. Thoat"
-    print "\t1. Tai cac khoa hoc"
-    print "\t2. Tai cac bai giang con thieu"
-    print ""
+    print ("Version: %s" % version.VERSION)
+    print("")
+    print("\t0. Thoat")
+    print("\t1. Tai cac khoa hoc")
+    print("\t2. Tai cac bai giang con thieu")
+    print("")
 
 def main():  
     while (True):
@@ -530,11 +618,11 @@ def main():
         g_session = requests.Session()
         os.system('cls')
         menu()
-        option = raw_input("\t>> ")
+        option = input("\t>> ")
         try:
             option = int(option)
         except ValueError:
-            print "\n\t>> Nhap SO <<"
+            print("\n\t>> Nhap SO <<")
             continue
         if(option == 0):
             return
@@ -543,15 +631,21 @@ def main():
         elif(option == 2):
             DonwloadLessions()
         else:
-            print "\n\t>> Khong co lua chon phu hop <<"
+            print("\n\t>> Khong co lua chon phu hop <<")
         g_session.close()
-        raw_input('\n\tNhan enter de tiep tuc...')
+        input('\n\tNhan enter de tiep tuc...')
 
 if __name__ == '__main__':
     # os.environ['HTTP_PROXY'] = "http://127.0.0.1:8888"
     # os.environ['HTTPS_PROXY'] = os.environ['HTTP_PROXY']
 
+    args = build_args()
+    # if args.no_update:
+    #     update.CheckUpdate()
     try:
         main()
     except KeyboardInterrupt:
-        print "CTRL-C break"
+        print("CTRL-C break")
+
+# nhhuayt@yahoo.com
+# 09051990
