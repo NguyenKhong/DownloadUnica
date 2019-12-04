@@ -4,19 +4,15 @@ import sys
 import os
 
 if __package__ is None and not hasattr(sys, 'frozen'):
-    # direct call of __main__.py
-    # print ("import new")
     path = os.path.realpath(os.path.abspath(__file__))
     sys.path.insert(0, os.path.dirname(os.path.dirname(path)))
 
-# input(">>>>> ")
 import requests
 import re
 from bs4 import BeautifulSoup
 import time
 import timeit
 from urllib.parse import urljoin, urlparse
-import unicodedata
 import datetime
 import ntpath
 import struct
@@ -27,7 +23,7 @@ import logging
 import ctypes
 import json
 import queue
-from var_dump import var_dump
+# from var_dump import var_dump
 from streamlink_cli.main import main as streamlink_cli_main
 import update
 import version
@@ -48,9 +44,7 @@ if getattr(sys, 'frozen', False):
 else:
     FFMPEG_LOCATION = os.path.join(os.getcwd(), 'ffmpeg', 'ffmpeg.exe')
 
-# std_headers['User-Agent'] = USER_AGENT
-
-g_CurrentDir = "d:\\"#os.getcwd()
+g_CurrentDir = os.getcwd()
 kernel32 = ctypes.windll.kernel32
 
 logger = logging.getLogger("DownloadUnica")
@@ -64,12 +58,6 @@ file_logger.setFormatter(formatter)
 logger.addHandler(stdout_logger)
 logger.addHandler(file_logger)
 logger.setLevel(logging.INFO)
-
-def NoAccentVietnamese(s):
-    s = s.encode().decode('utf-8')
-    s = re.sub('Đ', 'D', s)
-    s = re.sub('đ', 'd', s)
-    return unicodedata.normalize('NFKD', str(s)).encode('ASCII', 'ignore')
 
 def removeCharacters(value, deletechars = '<>:"/\|?*'):
     value = str(value)
@@ -164,23 +152,6 @@ def GetCourses():
 def GetLessions(url):
     r = Request(url, session = g_session)
     soup = BeautifulSoup(r.content, 'html5lib')
-
-    # Menu = soup.find('div', {'class' : 'menu'})
-    
-    # buttonBuy = soup.findAll('a', {'class' : 'btn-red btn-buy'})
-    # if buttonBuy:
-    #     print "Khoa hoc nay chua mua."
-    #     return [] 
-    # if not Menu:
-    #     logger.warning('Loi Khong the phan tich toan bo bai giang nay')
-    #     return []
-    # if not Menu.a.get('href'):
-    #     logger.warning('Loi Thieu url de phan tich bai giang')
-    #     return []
-
-    # url = urljoin(url, Menu.a.get('href'))
-    # r = Request(url, session = g_session)
-    # soup = BeautifulSoup(r.content, 'html5lib') 
     Lessions = soup.findAll('div', {'class' : 'col-xs-9 col-md-10'})
     if not Lessions:
         logger.warning('Loi Khong the lay danh sach bai giang')
@@ -202,12 +173,8 @@ def GetVideoAndDocument(url, serverOption = 1, isGetLinkDocument = True):
         url + "?server=qt"
     ]
     
-
     r = Request(servers[serverOption-1], headers = headers, session = g_session)
-    # url_videos = re.findall(r'{"file":"(.*?)","label":"(\d+)p', r.content)
-    # url_videos = re.findall(r'{"file":"([^\[\{\"]*?)","label":"', r.text)
     url_videos = re.findall(r'src: "(.*?)".*?label: "(\d+)"', r.text, re.DOTALL)
-
     if url_videos:
         max_resolution = -1
         for url, resolution in url_videos:
@@ -233,7 +200,6 @@ def GetVideoAndDocument(url, serverOption = 1, isGetLinkDocument = True):
     if isGetLinkDocument:
         soup = BeautifulSoup(r.content, 'html5lib')
         documentDownloads = soup.find('div', {'id': 'fileLession'}).findAll('div', {'class': 'uom-file-ulti'})
-        # if documentDownload.text.find(u'Tài liệu của bài học') != -1:
         for i in documentDownloads:
             urlDocuments.append(urljoin(url, i.a.get('href'))) 
     return infoMedia, urlDocuments 
@@ -340,9 +306,7 @@ def DownloadCourses():
         print(course['title'])
         pathDirCourse = os.path.join(DirDownload, removeCharacters(course['title'], '.<>:"/\|?*\r\n'))
         if not os.path.exists(pathDirCourse): os.mkdir(pathDirCourse)
-        pathDirComplete = os.path.join(pathDirCourse, "complete")
-        if not os.path.exists(pathDirComplete): os.mkdir(pathDirComplete)
-        DirDocuments = os.path.join(pathDirComplete, "Documents")
+        DirDocuments = os.path.join(pathDirCourse, "Documents")
         if not os.path.exists(DirDocuments): os.mkdir(DirDocuments)
         Lessions = GetLessions(course['url'])
         iLessions = 1
@@ -360,7 +324,7 @@ def DownloadCourses():
             threadDownloadDocument.setDaemon(False)
             threadDownloadDocument.start()
 
-            pathFileOutput = os.path.join(pathDirComplete, lessionTitleClean + ".mp4")
+            pathFileOutput = os.path.join(pathDirCourse, lessionTitleClean + ".mp4")
             if not os.path.exists(pathFileOutput):
                 options = [
                     # '--loglevel',
@@ -452,9 +416,7 @@ def DonwloadLessions():
     print(course['title'])
     pathDirCourse = os.path.join(DirDownload, removeCharacters(course['title'], '.<>:"/\|?*\r\n'))
     if not os.path.exists(pathDirCourse): os.mkdir(pathDirCourse)
-    pathDirComplete = os.path.join(pathDirCourse, "complete")
-    if not os.path.exists(pathDirComplete): os.mkdir(pathDirComplete)
-    DirDocuments = os.path.join(pathDirComplete, "Documents")
+    DirDocuments = os.path.join(pathDirCourse, "Documents")
     if not os.path.exists(DirDocuments): os.mkdir(DirDocuments)
     Lessions = GetLessions(course['url'])
     if not Lessions: return
@@ -507,11 +469,11 @@ def DonwloadLessions():
         threadDownloadDocument.setDaemon(False)
         threadDownloadDocument.start()
 
-        pathFileOutput = os.path.join(pathDirComplete, lessionTitleClean + ".mp4")
+        pathFileOutput = os.path.join(pathDirCourse, lessionTitleClean + ".mp4")
         if not os.path.exists(pathFileOutput):
             options = [
-                '--loglevel',
-                'debug',
+                # '--loglevel',
+                # 'debug',
                 '--ringbuffer-size',
                 '64M',
                 '--ffmpeg-ffmpeg',
@@ -590,7 +552,7 @@ Please enter -n or --no-update to disable process update."""
 
     description = """\
 Please enter -b or --bypass-buy to bypass buy course."""
-    parser = argparse.ArgumentParser(description = description, formatter_class=argparse.RawTextHelpFormatter)
+    
     parser.add_argument('-b', '--bypass-buy', action = 'store_true', dest="bypass_buy", help = 'bypass buy course')
     args = parser.parse_args()
     return args
@@ -640,12 +602,9 @@ if __name__ == '__main__':
     # os.environ['HTTPS_PROXY'] = os.environ['HTTP_PROXY']
 
     args = build_args()
-    # if args.no_update:
-    #     update.CheckUpdate()
+    if args.no_update:
+        update.CheckUpdate()
     try:
         main()
     except KeyboardInterrupt:
         print("CTRL-C break")
-
-# nhhuayt@yahoo.com
-# 09051990
