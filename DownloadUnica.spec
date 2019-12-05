@@ -25,6 +25,6 @@ exe = EXE(pyz,
           name='DownloadUnica',
           debug=False,
           strip=False,
-          upx=True,
+          upx=False,
           runtime_tmpdir=None,
           console=True, icon='Unica.ico')

@@ -1,5 +1,5 @@
-requests
-BeautifulSoup
+requests>=2.21.0,<3.0
+BeautifulSoup4
 html5lib
 pycountry
 pycryptodome
